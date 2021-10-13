@@ -6,7 +6,92 @@
 </head>
 
 <body>
+
+	<input type="text" id="password" style="width:400px;"></input>
+	<label for="password">password</label><br><br>
+
+	<textarea id="plaintext" style="width:400px; height: 100px;"></textarea>
+	<label for="plaintext">plaintext</label><br><br>
+
+	<textarea id="ciphertext" style="width:400px; height: 100px;"></textarea>
+	<label for="ciphertext">ciphertext</label><br><br>
+
+	<input type="button" onclick="encrypt()" value="encrypt"></input>
+	<input type="button" onclick="decrypt()" value="decrypt"></input>
+
 	<p> my paragraph </p>
-	<img src="res/frog_well.png" alt="frog in well"</img>
+	<img src="res/frog_well.png" alt="image of frog in well (not loaded)"</img>
 <body>
+
+<script src="encrypt.js"></script>
+<script>
+AES_Init();
+const MAX_PASSWORD_LENGTH = 32;
+let key, block;
+let plaintextArea = document.getElementById('plaintext');
+let ciphertextArea = document.getElementById('ciphertext');
+
+function read_key()
+{
+	// convert password string into valid key
+	let password = document.getElementById('password').value;
+	console.assert(password.length <= MAX_PASSWORD_LENGTH, `maximum password length ${MAX_PASSWORD_LENGTH}; found ${password.length}`);
+	key = Array.from(password).map(ch => {
+		let code = ch.charCodeAt(0);
+		console.assert(code >= 33 && code < 127, `invalid character (${ch}) with ASCII code ${code}`);
+		return code;
+	});
+	key = key.concat(new Array(MAX_PASSWORD_LENGTH-password.length).fill(0));
+	AES_ExpandKey(key);
+}
+
+function encrypt()
+{
+	read_key();
+	
+	// convert plaintext message to valid block
+	let plaintext = plaintextArea.value;
+	block = [];
+	for(let i = 0; i < plaintext.length; ++i)
+	{
+		let code = plaintext[i].charCodeAt(0);
+		if (code >= 256)
+		{
+			console.assert(code < 256*256, `invalid character (${plaintext[i]}) with char code ${code}`);
+			block.push('\\'.charCodeAt(0), 'u'.charCodeAt(0),
+				((code >> 12) % 16).toString(16).charCodeAt(0),
+				((code >>  8) % 16).toString(16).charCodeAt(0),
+				((code >>  4) % 16).toString(16).charCodeAt(0),
+				( code        % 16).toString(16).charCodeAt(0));
+		}
+		else
+		{
+			block.push(code);
+		}
+	}
+	block = block.concat(new Array((16 - (block.length % 16))%16).fill(0));
+	
+	AES_Encrypt(block, key);
+	ciphertextArea.value = block.toString();
+}
+
+function decrypt()
+{
+	read_key();
+	console.log('key: ', key);
+	
+	block = ciphertextArea.value.split(',').map(s => parseInt(s));
+	console.assert(block.length % 16 == 0, `ciphertext of length ${block.length} but expected multiple of 16`);
+	AES_Decrypt(block, key);
+	let plaintext = block.map(code => String.fromCharCode(parseInt(code))).join('');
+	plaintext = plaintext.replaceAll( /\\u([A-Za-z0-9]{4})/g, (match, p1) => {
+		console.log('matched char code', parseInt(p1, 16));
+		return String.fromCharCode(parseInt(p1, 16));
+	});
+	
+	// remove tail
+	plaintextArea.value = plaintext;
+}
+
+</script>
 </html>
